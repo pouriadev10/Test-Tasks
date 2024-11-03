@@ -19,6 +19,7 @@ const ProductsTabs = () => {
   const [foundedProductId, setFoundedProductId] = useState(null);
   const [activeKey, setActiveKey] = useState('');
   const [highlightItems, setHighlightItems] = useState()
+  const [reqId, setReqId] = useState(null)
 
 
 
@@ -32,6 +33,8 @@ const ProductsTabs = () => {
     let segments = pathname.split('/');
 
     let id = segments[segments.length - 1] || segments[segments.length - 2];
+
+    setReqId(id)
 
     
     fetch('http://api.sepehrdev.pardis/api/Supply/PriceConfirm/' + id)
@@ -178,6 +181,9 @@ const ProductsTabs = () => {
                 searchvalue={searchvalue}
                 activeKey={foundedSetId}
                 highlightItems={highlightItems}
+                urlId= {reqId}
+                products={products}
+                title= {product.title}
 
               />
             </Tabs.TabPane>

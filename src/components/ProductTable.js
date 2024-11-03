@@ -5,13 +5,17 @@ import './Table.css';
 
 const { Option } = Select;
 
-const ProductTable = ({ product, providers, providerPrice, showCheckboxes, highlightItems }) => {
+const ProductTable = ({ product, providers, providerPrice, showCheckboxes, highlightItems, urlId, products }) => {
   const [data, setData] = useState([]);
   const [columns, setColumns] = useState([]);
   const [selectedItems, setSelectedItems] = useState({});
   const [isModalVisible, setIsModalVisible] = useState(false);
   const [selectedCellData, setSelectedCellData] = useState(null);
   const [providerName, setProviderName] = useState('');
+  const [foundedId, setFoundedId] = useState(null);
+  const [foundedSubId, setFoundedSubId] = useState(null);
+
+
 
 
 
@@ -84,6 +88,7 @@ const ProductTable = ({ product, providers, providerPrice, showCheckboxes, highl
         partNumber: item.partNumber,
         quantity: item.quantity,
         unit: item.unit,
+        title: item.title,
         comment: item.comment,
         isSubItem: false,
         productDetails: item,
@@ -99,6 +104,7 @@ const ProductTable = ({ product, providers, providerPrice, showCheckboxes, highl
             key: `item-${itemIndex}-subItem-${subItemIndex}`,
             rowNumber: `${itemIndex + 1}-${subItemIndex + 1}`,
             name: subItem.title,
+            title: item.title,
             partNumber: subItem.partNumber,
             quantity: subItem.quantity,
             unit: subItem.unit,
@@ -185,64 +191,60 @@ const ProductTable = ({ product, providers, providerPrice, showCheckboxes, highl
         );
       },
       onCell: (record) => ({
-        onClick: () => handleCellClick(record, provider),
+        onClick: () => handleCellClick(record, provider, product, providerPrice),
         style: { cursor: 'pointer' },
       }),
       summary: () => {
         const totalByCurrency = {};
-      
-        // Group by currency and calculate total
-        providerPrice?.forEach((pro) => {
-          pro.providers.forEach((prov) => {
-            const currencyTotals = calculateTotalPriceByProvider(pro.id, prov.provider?.id);
+
+        providerPrice.forEach((pro) => {
+          pro.providers.forEach((provider) => {
+            const providerId = provider.provider.id;
+
+            const currencyTotals = calculateTotalPriceByProvider(pro.provider?.id, providerId);
+
             Object.keys(currencyTotals).forEach((currency) => {
               if (!totalByCurrency[currency]) {
                 totalByCurrency[currency] = currencyTotals[currency];
               } else {
-                // totalByCurrency[currency] += currencyTotals[currency];
               }
             });
           });
         });
-      
-        // Filter and display only the selected currencies
-        const selectedCurrencies = ['USD', 'AED', 'EUR']; // Example of selected currencies
-        const filteredTotals = Object.keys(totalByCurrency).reduce((acc, currency) => {
-          if (selectedCurrencies.includes(currency)) {
-            acc[currency] = totalByCurrency[currency];
-          }
-          return acc;
-        }, {});
-      
+
+        const selectedCurrencies = ['USD', 'AED', 'EUR'];
+
         return (
-          <>
-            {Object.keys(filteredTotals).map((currency) => (
-              <div
-                key={currency} // Add a key for list items
-                style={{
-                  textAlign: 'center',
-                  fontWeight: 'bold',
-                  display: 'flex',
-                  justifyContent: 'center',
-                  alignItems: 'center',
-                }}
-              >
+          <Table.Summary.Row>
+            {selectedCurrencies.map((currency, index) => (
+              <Table.Summary.Cell key={index} align="center">
                 <div
                   style={{
-                    width: 125,
-                    height: 45,
-                    border: '2px solid orange',
-                    borderRadius: 6,
+                    textAlign: 'center',
+                    fontWeight: 'bold',
                     display: 'flex',
                     justifyContent: 'center',
                     alignItems: 'center',
+                    width: '100%',
                   }}
                 >
-                  {currency} : {toPersianNumber(filteredTotals[currency])}
+                  <div
+                    style={{
+                      width: 125,
+                      height: 45,
+                      border: '2px solid orange',
+                      borderRadius: 6,
+                      display: 'flex',
+                      justifyContent: 'center',
+                      alignItems: 'center',
+                    }}
+                  >
+                    {currency}: {toPersianNumber(totalByCurrency[currency] || 0)}
+                  </div>
                 </div>
-              </div>
+              </Table.Summary.Cell>
             ))}
-          </>
+          </Table.Summary.Row>
         );
       },
 
@@ -334,52 +336,129 @@ const ProductTable = ({ product, providers, providerPrice, showCheckboxes, highl
 
   const handleCellClick = (record, column) => {
     setSelectedCellData({ record, column });
+    console.log(selectedCellData);
+
     if (typeof column !== 'string') {
-      const providerDetails = record.providers.find(
-        (provider) => provider.provider.id === column.provider.id
+      const providerDetails = record.providers?.find(
+        (provider) => provider?.provider.id === column.provider?.id
       );
 
+      if (product) {
+        console.log(record)
+        if (record) {
+          const similarPartNumbers = product?.items?.filter(
+            (part) => part.partNumber && part.partNumber.includes(record.partNumber)
+          );
 
-      if (providerDetails) {
-        setValue('quantity', providerDetails.quantity);
-        setValue('price', providerDetails.price);
-        setValue('totalPrice', providerDetails.price * providerDetails.quantity);
-        setValue('finalPricePerUnit', providerDetails.price * (1 - providerDetails.discount / 100));
-        setValue('finalTotalPrice', providerDetails.price * (1 - providerDetails.discount / 100) * providerDetails.quantity);
-        setValue('discount', providerDetails.discount);
-        setValue('currency', providerDetails.currency || 'یورو');
-        setValue('supplyType', providerDetails.supplyType || 'رسمی');
-        setValue('category', providerDetails.category || 'محصول');
-        setValue('paymentTerms', providerDetails.paymentTerms || '');
-        setProviderName(providerDetails.provider.name);
-      } else {
-        reset();
+
+
+
+
+
+          if (similarPartNumbers && similarPartNumbers.length > 0) {
+            console.log('Similar part numbers found:', similarPartNumbers);
+            setFoundedId(similarPartNumbers[0]?.supplyProductId)
+            console.log(foundedId)
+
+            const foundSet = products.find(product =>
+              product.items?.some(item => item?.supplyProductId === foundedId)
+            )
+
+            console.log(foundSet)
+
+
+          } else {
+            console.log('Checking for similar sub items...');
+            console.log('Product:', record.product);
+
+            let foundSimilarSubItems = false;
+            product?.items?.forEach(prod => {
+              if (prod.subItems) {
+                const similarSubItems = prod.subItems.filter(
+                  (sub) => sub.partNumber && sub.partNumber.includes(record.partNumber)
+                );
+
+                if (similarSubItems.length > 1) {
+                  console.log('Similar sub items found:', similarSubItems);
+                  setFoundedSubId(similarSubItems[1]?.supplyProductId)
+                  console.log(foundedSubId)
+
+                  const foundSet = products.find(product =>
+                    product.items?.some(item =>
+                      item.subItems?.some(subItem => subItem.supplyProductId === foundedSubId)
+                    )
+                  );
+
+                  console.log(foundSet?.id)
+
+                  foundSimilarSubItems = true;
+                }
+              }
+            });
+
+            if (!foundSimilarSubItems) {
+              console.log('No similar sub items found.');
+            }
+          }
+        }
+
+        if (providerDetails) {
+          setValue('quantity', providerDetails.quantity);
+          setValue('price', providerDetails.price);
+          setValue('totalPrice', providerDetails.price * providerDetails.quantity);
+          setValue('finalPricePerUnit', providerDetails.price * (1 - providerDetails.discount / 100));
+          setValue('finalTotalPrice', providerDetails.price * (1 - providerDetails.discount / 100) * providerDetails.quantity);
+          setValue('discount', providerDetails.discount);
+          setValue('currency', providerDetails.currency || 'یورو');
+          setValue('supplyType', providerDetails.supplyType || 'رسمی');
+          setValue('category', providerDetails.category || 'محصول');
+          setValue('paymentTerms', providerDetails.paymentTerms || '');
+          setValue('providerName', providerDetails.provider.name);
+          setValue('providerPriceId', providerDetails?.id);
+          setValue('finalConfirmId', providerDetails.finalConfirmId);
+          setValue('supplyId', providerDetails.supplyProductId);
+          setValue('providerId', providerDetails.provider?.id);
+          setValue('supplyTypeId', providerDetails.supplyType?.id);
+        } else {
+          console.log('Invalid provider details or record.');
+          reset();
+        }
+
+
       }
+      setIsModalVisible(true);
     }
-
-    setIsModalVisible(true);
   };
+
+
 
   const handleModalOk = async (data) => {
     console.log('Form values:', data);
 
-    const formData = new FormData();
-
-    formData.append('quantity', data.quantity);
-    formData.append('price', data.price);
-    formData.append('totalPrice', data.totalPrice);
-    formData.append('finalPricePerUnit', data.finalPricePerUnit);
-    formData.append('finalTotalPrice', data.finalTotalPrice);
-    formData.append('discount', data.discount);
-    formData.append('currency', data.currency);
-    formData.append('supplyType', data.supplyType);
-    formData.append('category', data.category);
-    formData.append('paymentTerms', data.paymentTerms);
+    const formData = {
+      prvPrcDtlId: data.providerPriceId,
+      finalConfirmId: data.finalConfirmId,
+      supplyProductId: data.supplyId,
+      providerId: data.providerId,
+      supplyRequestId: urlId,
+      supplyTypeId: data.supplyTypeId,
+      totalPrice: data.totalPrice,
+      price: data.price,
+      discountPercent: data.discount,
+      quantity: data.quantity,
+      // supplyType: data.supplyType,
+      supplyCategoryId: 0,
+      termsOfPayment: data.paymentTerms,
+      priceType: 1,
+    };
 
     try {
-      const response = await fetch('https://dummyjson.com/c/f2dc-400e-4fc3-a343', {
+      const response = await fetch('http://api.sepehrdev.pardis/api/Supply/Providers/Confirm', {
         method: 'POST',
-        body: formData,
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(formData),
       });
 
       if (!response.ok) {
@@ -397,7 +476,6 @@ const ProductTable = ({ product, providers, providerPrice, showCheckboxes, highl
     setProviderName('');
   };
 
-
   const handleModalCancel = () => {
     setIsModalVisible(false);
     setSelectedCellData(null);
@@ -406,21 +484,17 @@ const ProductTable = ({ product, providers, providerPrice, showCheckboxes, highl
 
   const calculateTotalPriceByProvider = (proId, providerId) => {
     const totalByCurrency = {};
-  
+
     data.forEach((item) => {
       const providerDetails = item.providers.find(
         (p) => p.provider.id === providerId
       );
-  
-      // Find the provider detail that matches the proId
-      const provDetail = providerPrice.find((pro) => pro.id === proId);
-  
-      // Check if the item is selected for this provider
-      if (providerDetails && provDetail && selectedItems[providerId]?.includes(item.key)) {
+
+
+      if (providerDetails && selectedItems[providerId]?.includes(item.key)) {
         const { currency, price, quantity } = providerDetails;
         const itemTotal = price * quantity;
-  
-        // Add item total to the respective currency total
+
         if (totalByCurrency[currency]) {
           totalByCurrency[currency] += itemTotal;
         } else {
@@ -428,7 +502,7 @@ const ProductTable = ({ product, providers, providerPrice, showCheckboxes, highl
         }
       }
     });
-  
+
     return totalByCurrency;
   };
 
@@ -463,15 +537,23 @@ const ProductTable = ({ product, providers, providerPrice, showCheckboxes, highl
         pagination={false}
         className="custom-table"
         bordered
-        summary={() => (
-          <Table.Summary.Row>
-            {columns.map((column, index) => (
-              <Table.Summary.Cell key={index} align="center">
-                {column.dataIndex && column.summary ? column.summary() : null}
+        summary={(pageData) => {
+          return (
+            <Table.Summary.Row>
+              {columns.map((column, index) => (
+                <Table.Summary.Cell key={index} align="center">
+                  {column.summary ? column.summary() : null}
+                </Table.Summary.Cell>
+              ))}
+              <Table.Summary.Cell align="center">
+                <div>
+                  <div>EUR: {toPersianNumber(totals.totalEUR)}</div>
+                  <div>USD: {toPersianNumber(totals.totalUSD)}</div>
+                </div>
               </Table.Summary.Cell>
-            ))}
-          </Table.Summary.Row>
-        )}
+            </Table.Summary.Row>
+          );
+        }}
       />
       <div style={{ marginTop: 20 }}>
         <div
@@ -543,6 +625,9 @@ const ProductTable = ({ product, providers, providerPrice, showCheckboxes, highl
           <div style={{ display: 'flex', flexDirection: 'row', marginBottom: 20 }}>
             <p style={{ marginLeft: 25 }}> تامین کننده : {providerName}</p>
             <p>ثبت کننده قیمت : -</p>
+          </div>
+          <div style={{ width: "100%", border: '1px solid orange', direction: "rtl" }}>
+            <p>پارت نامبر های مشابه : </p>
           </div>
           <form className="price-confirmation-form">
             <div className="form-row">
